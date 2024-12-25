@@ -1,0 +1,9 @@
+[package]
+name = "evetrade"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+log = "0.4"
+env_logger = "0.10.2"
+chrono = "0.4.39"
