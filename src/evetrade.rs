@@ -1,22 +1,34 @@
 use chrono::Local;
 use env_logger::Builder;
-use log::{debug, error, info, trace, warn, Level, LevelFilter};
+use log::{error, info, Level, LevelFilter};
 use std::io::Write;
 
-use crate::urls;
+use crate::esi;
+use crate::processor::OrderProcessor;
+use crate::route::Route;
+
+#[derive(Debug)]
+pub enum EvetradeError {
+    ESIError,
+    IOError,
+}
 
 pub struct Evetrade {
+    esi: esi::ESI,
     is_initialized: bool,
+    routes: Vec<Route>,
 }
 
 impl Evetrade {
     pub fn new() -> Self {
         Self {
             is_initialized: false,
+            esi: esi::ESI::new(),
+            routes: Vec::new(),
         }
     }
 
-    pub fn init(&mut self) {
+    pub fn init(&mut self) -> Result<(), EvetradeError> {
         Builder::new()
             .format(|buf, record| {
                 let now = Local::now();
@@ -62,13 +74,69 @@ impl Evetrade {
                     record.args()
                 )
             })
-            .filter_level(LevelFilter::Trace)
+            .filter_level(LevelFilter::Debug)
             .init();
 
         info!("Logger initialized successfully!");
 
-        urls::get_market_browser_url(123);
+        if let Err(_) = self.esi.get_all_data() {
+            error!("Failed to fetch all required data! Shutting down...");
+            return Err(EvetradeError::ESIError);
+        }
 
         self.is_initialized = true;
+        Ok(())
+    }
+
+    pub fn compute(&mut self) -> Result<(), EvetradeError> {
+        info!("Computing routes...");
+        let mut processor = OrderProcessor::new(
+            self.esi.orders.clone(),
+            self.esi.systems.clone(),
+            self.esi.types.clone(),
+            self.esi.mean_jump_distance,
+        );
+
+        self.routes = processor.compute();
+
+        info!("Sorting routes...");
+        Route::sort_routes(&mut self.routes);
+
+        Ok(())
+    }
+
+    pub fn display_and_save(&mut self) -> Result<(), EvetradeError> {
+        info!("Displaying routes...");
+
+        for route in &mut self.routes {
+            println!("{}", route.represent());
+        }
+
+        info!("Saving routes...");
+
+        let mut file = std::fs::File::create("results.txt").map_err(|err| {
+            error!("Failed to create file: {}", err);
+            EvetradeError::IOError
+        })?;
+
+        for route in &mut self.routes {
+            writeln!(file, "{}", route.represent()).map_err(|err| {
+                error!("Failed to write to file: {}", err);
+                EvetradeError::IOError
+            })?;
+        }
+
+        Ok(())
     }
 }
+
+impl std::fmt::Display for EvetradeError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            EvetradeError::ESIError => write!(f, "Failed to perform API requests!"),
+            EvetradeError::IOError => write!(f, "Failed to save routes!"),
+        }
+    }
+}
+
+impl std::error::Error for EvetradeError {}

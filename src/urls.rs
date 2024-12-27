@@ -1,5 +1,3 @@
-use log::info;
-
 const MARKET_BROWSER_URL: &'static str = "https://evemarketbrowser.com/region/0/type";
 const GATECAMP_URL: &'static str = "https://eve-gatecheck.space/eve/#";
 const ESI_SCRAPE_URL: &'static str =
@@ -16,11 +14,10 @@ pub fn get_market_data_url() -> String {
 }
 
 pub fn get_market_browser_url(type_id: u32) -> String {
-    info!("Getting market browser url for type id {}", type_id);
     format!("{}/{}", MARKET_BROWSER_URL, type_id)
 }
 
-pub fn get_gatecamp_url(path: Vec<u32>, flag: &str) -> String {
+pub fn get_gatecamp_url(path: Vec<String>, flag: &str) -> String {
     if path.len() < 2 {
         return "".to_string(); // Invalid path
     }
