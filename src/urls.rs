@@ -1,8 +1,7 @@
-const MARKET_BROWSER_URL: &'static str = "https://evemarketbrowser.com/region/0/type";
-const GATECAMP_URL: &'static str = "https://eve-gatecheck.space/eve/#";
-const ESI_SCRAPE_URL: &'static str =
-    "https://data.everef.net/esi-scrape/eve-ref-esi-scrape-latest.tar.xz";
-const MARKET_DATA_URL: &'static str =
+const MARKET_BROWSER_URL: &str = "https://evemarketbrowser.com/region/0/type";
+const GATECAMP_URL: &str = "https://eve-gatecheck.space/eve/#";
+const ESI_SCRAPE_URL: &str = "https://data.everef.net/esi-scrape/eve-ref-esi-scrape-latest.tar.xz";
+const MARKET_DATA_URL: &str =
     "https://data.everef.net/market-orders/market-orders-latest.v3.csv.bz2";
 
 pub fn get_esi_scrape_url() -> String {

@@ -23,7 +23,7 @@ pub struct System {
     pub position: Vector3,
 }
 
-#[derive(serde::Serialize, serde::Deserialize, Clone)]
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
 pub struct Order {
     pub is_buy_order: bool,
     pub order_type: Type,
@@ -33,6 +33,40 @@ pub struct Order {
     pub region_id: u32,
     pub volume: f32,
 }
+
+#[derive(serde::Serialize, serde::Deserialize, Clone, Default)]
+pub struct OrderGroup {
+    pub buy: Vec<Order>,
+    pub sell: Vec<Order>,
+}
+
+impl OrderGroup {
+    pub fn new() -> Self {
+        Default::default()
+    }
+
+    pub fn add_order(&mut self, order: Order) {
+        if order.is_buy_order {
+            self.buy.push(order);
+        } else {
+            self.sell.push(order);
+        }
+    }
+}
+
+// impl Default for OrderGroup {
+//     fn default() -> Self {
+//         OrderGroup {
+//             buy: Vec::new(),
+//             sell: Vec::new(),
+//         }
+//     }
+// }
+
+// #[derive(serde::Serialize, serde::Deserialize, Clone)]
+// pub struct OrderBook {
+//     pub orders: std::collections::HashMap<i32, OrderGroup>, // Key: type id
+// }
 
 pub struct TradePair {
     pub buy_system_id: i32,
@@ -46,7 +80,7 @@ pub struct TradePair {
     pub profit_per_jump: f32,
 }
 
-#[derive(serde::Serialize, serde::Deserialize, Clone)]
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
 pub struct Type {
     pub type_id: u32,
     pub group_id: u32,

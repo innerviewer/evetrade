@@ -91,9 +91,9 @@ impl Evetrade {
     pub fn compute(&mut self) -> Result<(), EvetradeError> {
         info!("Computing routes...");
         let mut processor = OrderProcessor::new(
-            self.esi.orders.clone(),
-            self.esi.systems.clone(),
-            self.esi.types.clone(),
+            &mut self.esi.orders,
+            &self.esi.systems,
+            &self.esi.types,
             self.esi.mean_jump_distance,
         );
 

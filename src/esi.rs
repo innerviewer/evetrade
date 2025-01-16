@@ -10,7 +10,7 @@ use tar::Archive;
 use xz2::read::XzDecoder;
 
 use crate::settings::SETTINGS;
-use crate::types::{Order, Stargate, System, Type, Vector3};
+use crate::types::{Order, OrderGroup, Stargate, System, Type, Vector3};
 use crate::urls;
 
 // {
@@ -27,7 +27,7 @@ pub enum ESIError {
 }
 
 pub struct ESI {
-    pub orders: Vec<Order>,
+    pub orders: std::collections::HashMap<u32, OrderGroup>,
     pub systems: HashMap<u32, System>,
     pub types: HashMap<u32, Type>,
     pub mean_jump_distance: f64,
@@ -36,7 +36,7 @@ pub struct ESI {
 impl ESI {
     pub fn new() -> Self {
         Self {
-            orders: Vec::new(),
+            orders: HashMap::new(),
             systems: HashMap::new(),
             types: HashMap::new(),
             mean_jump_distance: 0.0,
@@ -158,7 +158,7 @@ impl ESI {
 
         let mut stargate_map = HashMap::new();
         for (key, value) in stargates {
-            let system_id = key.parse::<u32>().unwrap();
+            let system_id = value.system_id;
             let destination_system_id = value.destination.system_id;
 
             stargate_map
@@ -230,7 +230,7 @@ impl ESI {
                 System {
                     id: system_id,
                     name: name.to_string(),
-                    security_status: security_status,
+                    security_status,
                     stargates: system_stargates,
                     position: system_position,
                 },
@@ -296,7 +296,9 @@ impl ESI {
         let mut reader = csv::Reader::from_reader(csv_data);
 
         info!("Parsing order data...");
+        let mut i = 0;
         for result in reader.records() {
+            i += 1;
             let record = result.map_err(|err| {
                 error!("Failed to parse order data! \n\tError: {}", err);
                 ESIError::InvalidData
@@ -323,8 +325,13 @@ impl ESI {
                 continue;
             }
 
-            self.orders.push(order);
+            self.orders
+                .entry(type_id)
+                .or_insert_with(OrderGroup::new)
+                .add_order(order);
         }
+
+        info!("orders total: {}", i);
 
         Ok(())
     }
@@ -411,6 +418,7 @@ struct StargateDestination {
 #[derive(Debug, serde::Deserialize)]
 struct StargateData {
     destination: StargateDestination,
+    system_id: u32,
 }
 
 #[derive(Debug, serde::Deserialize)]

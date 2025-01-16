@@ -1,3 +1,4 @@
+use log::error;
 use std::fmt::Write;
 
 use crate::types::{Order, System, Waypoint};
@@ -60,9 +61,9 @@ impl Route {
         }
 
         if buy_total == 0.0 && sell_total == 0.0 {
-            println!("[Error] Route::calculate_profit() : no orders found.");
+            error!("No orders found.");
         } else if buy_total == 0.0 || sell_total == 0.0 {
-            println!("[Error] Route::calculate_profit() : missing buy or sell order.");
+            error!("Missing buy or sell order.");
         }
 
         self.profit = sell_total - buy_total;
