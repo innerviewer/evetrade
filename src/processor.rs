@@ -12,7 +12,6 @@ struct PreprocessStats {
     initial_types: usize,
     removed_empty: usize,
     removed_volume: usize,
-    removed_price: usize,
     removed_unprofitable: usize,
     final_types: usize,
 }
@@ -77,7 +76,6 @@ impl<'a> OrderProcessor<'a> {
             initial_types: self.orders.len(),
             removed_empty: 0,
             removed_volume: 0,
-            removed_price: 0,
             removed_unprofitable: 0,
             final_types: 0,
         };
@@ -92,15 +90,6 @@ impl<'a> OrderProcessor<'a> {
                     continue;
                 }
 
-                // Sort orders by price (descending for buy, ascending for sell)
-                order_group
-                    .buy
-                    .sort_by(|a, b| b.price.partial_cmp(&a.price).unwrap());
-                order_group
-                    .sell
-                    .sort_by(|a, b| a.price.partial_cmp(&b.price).unwrap());
-
-                // Check item type constraints
                 if let Some(item_type) = self.types.get(&type_id) {
                     if item_type.volume > self.cargo_volume {
                         self.orders.remove(&type_id);
@@ -111,47 +100,75 @@ impl<'a> OrderProcessor<'a> {
                     self.orders.remove(&type_id);
                     continue;
                 }
+
+                // Descending for buy, ascending for sell
+                order_group
+                    .buy
+                    .sort_by(|a, b| b.price.partial_cmp(&a.price).unwrap());
+                order_group
+                    .sell
+                    .sort_by(|a, b| a.price.partial_cmp(&b.price).unwrap());
             }
 
             if let Some(order_group) = self.orders.get_mut(&type_id) {
+                let buy_price = order_group.buy[0].price;
+                let sell_price = order_group.sell[0].price;
+                if (buy_price - sell_price) / sell_price < self.percentage_treshold {
+                    self.orders.remove(&type_id);
+                    stats.removed_unprofitable += 1;
+                    continue;
+                }
+
                 let mut truncate_buy_at = order_group.buy.len();
                 let mut truncate_sell_at = order_group.sell.len();
 
-                'outer: for (i, buy_order) in order_group.buy.iter().enumerate() {
-                    for (k, sell_order) in order_group.sell.iter().enumerate() {
+                // For each buy order, find if it has ANY profitable pairs
+                // P.S. Should I refactor this? Looks too complex, but we should normally break early
+                for (i, buy_order) in order_group.buy.iter().enumerate() {
+                    let mut has_profitable_trade = false;
+                    for sell_order in order_group.sell.iter() {
                         let profit_ratio = (buy_order.price - sell_order.price) / sell_order.price;
-
-                        // Debug print for profit check
-                        if i == 0 && k == 0 {
-                            println!("Type {} - First profit ratio: {}", type_id, profit_ratio);
+                        if profit_ratio >= self.percentage_treshold {
+                            has_profitable_trade = true;
+                            break;
                         }
+                    }
+                    if has_profitable_trade {
+                        truncate_buy_at = i + 1; // Keep this buy order
+                    } else {
+                        break; // No need to check further buy orders (they'll be worse)
+                    }
+                }
 
-                        if profit_ratio < 0.1 {
-                            // Using 0.1 as in your Python code
-                            truncate_buy_at = i;
-                            truncate_sell_at = k;
-                            println!("Type {} - Truncating at buy: {}, sell: {}", type_id, i, k);
-                            break 'outer;
+                // Doing the same thingy for sell orders
+                for (k, sell_order) in order_group.sell.iter().enumerate() {
+                    let mut has_profitable_trade = false;
+                    for buy_order in order_group.buy.iter() {
+                        let profit_ratio = (buy_order.price - sell_order.price) / sell_order.price;
+                        if profit_ratio >= self.percentage_treshold {
+                            has_profitable_trade = true;
+                            break;
                         }
+                    }
+                    if has_profitable_trade {
+                        truncate_sell_at = k + 1;
+                    } else {
+                        break;
                     }
                 }
 
                 order_group.buy.truncate(truncate_buy_at);
                 order_group.sell.truncate(truncate_sell_at);
 
-                // Debug print final state
-                println!(
-                    "Type {} - After truncate: {} buy, {} sell",
-                    type_id,
-                    order_group.buy.len(),
-                    order_group.sell.len()
-                );
+                if order_group.buy.is_empty() || order_group.sell.is_empty() {
+                    self.orders.remove(&type_id);
+                    stats.removed_unprofitable += 1;
+                }
             }
         }
 
         self.orders
             .retain(|_, group| !group.buy.is_empty() && !group.sell.is_empty());
-        //*self.orders = profitable_orders;
         stats.final_types = self.orders.len();
 
         stats
